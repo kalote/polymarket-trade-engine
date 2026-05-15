@@ -114,4 +114,79 @@ export class Env {
     }
     return config;
   }
+
+  static getStrategyParams(): AssetStrategyParams {
+    const asset = Env.get("MARKET_ASSET");
+    return ASSET_STRATEGY_DEFAULTS[asset] ?? ASSET_STRATEGY_DEFAULTS.btc;
+  }
 }
+
+export interface AssetStrategyParams {
+  shares: number;
+  minShares: number;
+  maxEntryPrice: number;
+  maxEntrySeconds: number;
+  initialStopDistance: number;
+  trailingStopDistance: number;
+  minLiquidity: number;
+  liquidityFullSize: number;
+  certaintyCutoff: number;
+}
+
+export const ASSET_STRATEGY_DEFAULTS: Record<MarketAsset, AssetStrategyParams> = {
+  btc: {
+    shares: 8,
+    minShares: 4,
+    maxEntryPrice: 0.98,
+    maxEntrySeconds: 120,
+    initialStopDistance: 0.10,
+    trailingStopDistance: 0.08,
+    minLiquidity: 30,
+    liquidityFullSize: 100,
+    certaintyCutoff: 0.80,
+  },
+  eth: {
+    shares: 50,
+    minShares: 15,
+    maxEntryPrice: 0.98,
+    maxEntrySeconds: 120,
+    initialStopDistance: 0.10,
+    trailingStopDistance: 0.08,
+    minLiquidity: 25,
+    liquidityFullSize: 200,
+    certaintyCutoff: 0.80,
+  },
+  sol: {
+    shares: 40,
+    minShares: 10,
+    maxEntryPrice: 0.98,
+    maxEntrySeconds: 120,
+    initialStopDistance: 0.10,
+    trailingStopDistance: 0.08,
+    minLiquidity: 20,
+    liquidityFullSize: 150,
+    certaintyCutoff: 0.80,
+  },
+  doge: {
+    shares: 25,
+    minShares: 8,
+    maxEntryPrice: 0.98,
+    maxEntrySeconds: 120,
+    initialStopDistance: 0.10,
+    trailingStopDistance: 0.08,
+    minLiquidity: 20,
+    liquidityFullSize: 80,
+    certaintyCutoff: 0.80,
+  },
+  xrp: {
+    shares: 6,
+    minShares: 3,
+    maxEntryPrice: 0.98,
+    maxEntrySeconds: 120,
+    initialStopDistance: 0.10,
+    trailingStopDistance: 0.08,
+    minLiquidity: 20,
+    liquidityFullSize: 40,
+    certaintyCutoff: 0.80,
+  },
+};
