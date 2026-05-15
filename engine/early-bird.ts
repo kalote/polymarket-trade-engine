@@ -41,6 +41,7 @@ export class EarlyBird {
   private _roundsCreated = 0;
   private _tracker!: WalletTracker;
   private _ticker = new TickerTracker();
+  private _btcTicker?: TickerTracker;
   private _userChannelFactory: (() => UserChannel) | null = null;
 
   constructor(
@@ -84,6 +85,15 @@ export class EarlyBird {
     this._ticker.schedule();
     await this._ticker.waitForReady();
     log.write(`[startup] ${Env.getAssetConfig().apiSymbol} ticker ready`);
+
+    // Create BTC ticker for cross-asset leading indicator (non-BTC bots only)
+    const asset = Env.get("MARKET_ASSET");
+    if (asset !== "btc") {
+      this._btcTicker = new TickerTracker("btc");
+      this._btcTicker.schedule();
+      await this._btcTicker.waitForReady();
+      log.write(`[startup] BTC cross-asset ticker ready`);
+    }
 
     await this._client.init();
 
@@ -217,6 +227,7 @@ export class EarlyBird {
             strategy: this._strategy,
             tracker: this._tracker,
             ticker: this._ticker,
+            btcTicker: this._btcTicker,
             alwaysLog: this._alwaysLog,
             userChannel: this._userChannelFactory!(),
           }),
@@ -281,6 +292,7 @@ export class EarlyBird {
       log.write("[shutdown] All settled. Exiting.", "dim");
       this._saveState();
       this._ticker.destroy();
+      this._btcTicker?.destroy();
       process.exit(0);
     }
   }

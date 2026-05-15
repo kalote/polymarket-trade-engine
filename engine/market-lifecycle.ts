@@ -61,6 +61,7 @@ type MarketLifecycleOptions = {
   strategy: Strategy;
   tracker: WalletTracker;
   ticker: TickerTracker;
+  btcTicker?: TickerTracker;
   userChannel: UserChannel;
   recovery?: RecoveryOptions;
   alwaysLog?: boolean;
@@ -98,6 +99,7 @@ export class MarketLifecycle {
   private readonly _strategy: Strategy;
   private readonly _tracker: WalletTracker;
   private readonly _ticker: TickerTracker;
+  private readonly _btcTicker?: TickerTracker;
   private readonly _alwaysLog: boolean;
 
   constructor(opts: MarketLifecycleOptions) {
@@ -109,6 +111,7 @@ export class MarketLifecycle {
     this._strategy = opts.strategy;
     this._tracker = opts.tracker;
     this._ticker = opts.ticker;
+    this._btcTicker = opts.btcTicker;
     this._alwaysLog = opts.alwaysLog ?? false;
     this._orderBook = opts.orderBook ?? new OrderBook();
     this._userChannel = opts.userChannel;
@@ -345,6 +348,7 @@ export class MarketLifecycle {
         };
       },
       ticker: this._ticker,
+      btcTicker: this._btcTicker,
       getMarketResult: () => {
         const slot = slotFromSlug(this.slug);
         return this.apiQueue.marketResult.get(slot.startTime);

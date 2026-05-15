@@ -60,6 +60,8 @@ export type StrategyContext = {
   }>;
 
   ticker: TickerTracker;
+  /** BTC price feed for cross-asset momentum signals. Only set for non-BTC assets. */
+  btcTicker?: TickerTracker;
   /** Read-only access to market open/close price data when available. */
   getMarketResult: () => MarketData | undefined;
 };

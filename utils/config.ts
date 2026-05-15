@@ -13,7 +13,7 @@ export type Config = {
   BUILDER_PASSPHRASE: string;
 };
 
-const ASSET_TICKER_MAP: Record<
+export const ASSET_TICKER_MAP: Record<
   MarketAsset,
   {
     slugPrefix: string;

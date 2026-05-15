@@ -1,4 +1,4 @@
-import { Env } from "../utils/config";
+import { Env, ASSET_TICKER_MAP, type MarketAsset } from "../utils/config";
 import {
   createReconnectingWs,
   type ReconnectingWs,
@@ -30,6 +30,18 @@ export class TickerTracker {
   private okxPingInterval?: ReturnType<typeof setInterval>;
   private bybitPingInterval?: ReturnType<typeof setInterval>;
   private validated = false;
+  private _assetOverride?: MarketAsset;
+
+  constructor(assetOverride?: MarketAsset) {
+    this._assetOverride = assetOverride;
+  }
+
+  private _getAssetConfig() {
+    if (this._assetOverride) {
+      return ASSET_TICKER_MAP[this._assetOverride];
+    }
+    return Env.getAssetConfig();
+  }
 
   get price() {
     return this.polymarketValue ?? this.binanceValue ?? this.coinbaseValue;
@@ -120,7 +132,7 @@ export class TickerTracker {
   }
 
   private connectBinance() {
-    const { binanceStream } = Env.getAssetConfig();
+    const { binanceStream } = this._getAssetConfig();
     this.binanceWs = createReconnectingWs({
       url: `wss://stream.binance.com:9443/ws/${binanceStream}@ticker`,
       label: "Binance",
@@ -152,7 +164,7 @@ export class TickerTracker {
   }
 
   private connectCoinbase() {
-    const { coinbaseProduct } = Env.getAssetConfig();
+    const { coinbaseProduct } = this._getAssetConfig();
     this.coinbaseWs = createReconnectingWs({
       url: COINBASE_WS_URL,
       label: "Coinbase",
@@ -179,7 +191,7 @@ export class TickerTracker {
 
   private connectPolymarket() {
     const WS_URL = "wss://ws-live-data.polymarket.com";
-    const MARKET = Env.getAssetConfig().polymarketSymbol;
+    const MARKET = this._getAssetConfig().polymarketSymbol;
 
     this.polymarketWs = createReconnectingWs({
       url: WS_URL,
@@ -231,7 +243,7 @@ export class TickerTracker {
   }
 
   private connectOkx() {
-    const { okxInstId } = Env.getAssetConfig();
+    const { okxInstId } = this._getAssetConfig();
     this.okxWs = createReconnectingWs({
       url: OKX_WS_URL,
       label: "OKX",
@@ -258,7 +270,7 @@ export class TickerTracker {
   }
 
   private connectBybit() {
-    const { bybitSymbol } = Env.getAssetConfig();
+    const { bybitSymbol } = this._getAssetConfig();
     this.bybitWs = createReconnectingWs({
       url: BYBIT_WS_URL,
       label: "ByBit",
