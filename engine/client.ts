@@ -25,7 +25,8 @@ import { Env } from "../utils/config";
 
 const RELAYER_URL = "https://relayer-v2.polymarket.com";
 const POLYGON_RPC = "https://polygon-bor-rpc.publicnode.com";
-const CTF_ADDRESS = "0xADa100874d00e3331D00F2007a9c336a65009718";
+const CTF_ADDRESS = "0x4D97DCd97eC945f40cF65F87097ACe5EA0476045";
+const CTF_ADAPTER = "0xAdA100Db00Ca00073811820692005400218FcE1f";
 const USDC_ADDRESS = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174";
 const pUSD_ADDRESS = "0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB";
 const ONRAMP = "0x93070a847efEf7F70739046A929D47a521F5B8ee" as const;
@@ -389,7 +390,7 @@ export class PolymarketEarlyBirdClient implements EarlyBirdClient {
       chain: Chain.POLYGON,
       signer: this._signer,
       creds,
-      signatureType: 1, // Magic/Email login
+      signatureType: 2, // Gnosis Safe (proxy/funder wallet)
       funderAddress: this._funder,
     });
   }
@@ -527,7 +528,7 @@ export class PolymarketEarlyBirdClient implements EarlyBirdClient {
       Chain.POLYGON,
       walletClient,
       this._builderConfig,
-      RelayerTxType.PROXY,
+      RelayerTxType.SAFE,
     );
   }
 
@@ -621,7 +622,7 @@ export class PolymarketEarlyBirdClient implements EarlyBirdClient {
     }
     try {
       const response = await relay.execute(
-        [{ to: CTF_ADDRESS, data, value: "0" }],
+        [{ to: CTF_ADAPTER, data, value: "0" }],
         "redeem positions",
       );
       const result = await response.wait();

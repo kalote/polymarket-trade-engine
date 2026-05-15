@@ -51,9 +51,10 @@ export class EarlyBird {
     alwaysLog = false,
   ) {
     this._prod = prod;
+    const asset = process.env.MARKET_ASSET ?? "unknown";
     this._statePath = prod
-      ? "state/early-bird-prod.json"
-      : "state/early-bird.json";
+      ? `state/early-bird-prod-${asset}.json`
+      : `state/early-bird-${asset}.json`;
     this._rounds = rounds;
     this._strategyName = strategyName ?? DEFAULT_STRATEGY;
     this._strategy = strategies[this._strategyName]!;

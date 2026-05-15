@@ -922,12 +922,28 @@ export class MarketLifecycle {
   private async _autoRedeem(): Promise<void> {
     if (!this._conditionId) return; // belt-and-suspenders
 
-    this._log(`[${this.slug}] Redeeming positions...`, "dim");
-    try {
-      await this.client.redeemPositions(this._conditionId, true);
-      this._log(`[${this.slug}] Redemption successful`, "green");
-    } catch (e) {
-      this._log(`[${this.slug}] Redemption failed: ${e}`, "red");
+    const MAX_RETRIES = 3;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      this._log(
+        `[${this.slug}] Redeeming positions...${attempt > 1 ? ` (retry ${attempt}/${MAX_RETRIES})` : ""}`,
+        "dim",
+      );
+      try {
+        await this.client.redeemPositions(this._conditionId, true);
+        this._log(`[${this.slug}] Redemption successful`, "green");
+        return;
+      } catch (e) {
+        if (attempt < MAX_RETRIES) {
+          const delay = attempt * 3_000; // 3s, 6s
+          this._log(
+            `[${this.slug}] Redemption attempt ${attempt} failed, retrying in ${delay / 1000}s: ${e}`,
+            "yellow",
+          );
+          await new Promise((r) => setTimeout(r, delay));
+        } else {
+          this._log(`[${this.slug}] Redemption failed after ${MAX_RETRIES} attempts: ${e}`, "red");
+        }
+      }
     }
   }
 

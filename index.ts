@@ -52,7 +52,7 @@ const opts = program.opts<{
   alwaysLog?: boolean;
 }>();
 
-acquireProcessLock("early-bird");
+acquireProcessLock(`early-bird-${process.env.MARKET_ASSET ?? "unknown"}`);
 
 if (!strategies[opts.strategy]) {
   console.error(`Unknown strategy: "${opts.strategy}"`);

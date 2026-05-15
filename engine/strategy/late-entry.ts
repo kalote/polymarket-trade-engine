@@ -201,6 +201,7 @@ type LateEntryPosition = {
   entryPrice: number;
   shares: number;
   stopLossPrice: number;
+  highWaterMark: number;
 };
 
 type LateEntryState = {
@@ -213,7 +214,11 @@ type LateEntryState = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const SHARES = 6;
+const SHARES = 5;
+const INITIAL_STOP_DISTANCE = 0.10;  // max loss per share ($1 on 10 shares)
+const TRAILING_STOP_DISTANCE = 0.08; // lock in profit: trail 8c behind peak
+const MAX_ENTRY_SECONDS = 90;        // only enter in the last 90s of a slot
+const MAX_ENTRY_PRICE = 0.94;        // reject entries above this (bad risk/reward)
 
 function checkEntry(params: {
   remaining: number;
@@ -246,30 +251,31 @@ function checkEntry(params: {
   const divergence = params.divergence ?? Infinity;
 
   if (
-    remaining <= 90 &&
+    remaining <= MAX_ENTRY_SECONDS &&
     atr &&
-    atr <= 2 &&
+    atr <= 5 &&
     gapSafety &&
-    gapSafety >= 40 &&
-    divergence <= 10 &&
+    gapSafety >= 20 &&
+    divergence <= 15 &&
     peakGapRatio &&
-    peakGapRatio >= 0.75
+    peakGapRatio >= 0.60
   ) {
-    const upCertain = up != null && up.price > 0.85;
-    const downCertain = down != null && down.price > 0.85;
+    const upCertain = up != null && up.price > 0.80;
+    const downCertain = down != null && down.price > 0.80;
 
     if (upCertain || downCertain) {
       const side: "UP" | "DOWN" = upCertain ? "UP" : "DOWN";
       const info = (side === "UP" ? up : down)!;
 
       if (info.liquidity < 20) return null;
+      if (info.price > MAX_ENTRY_PRICE) return null;  // risk/reward too poor
 
       return {
         side,
         ask: info.price,
         gap: absGap,
         liquidity: info.liquidity,
-        stopLossPrice: 0.48,
+        stopLossPrice: Math.max(info.price - INITIAL_STOP_DISTANCE, 0.01),
       };
     }
   }
@@ -300,6 +306,7 @@ function placeEntry(
           entryPrice: signal.ask,
           shares: filledShares,
           stopLossPrice: signal.stopLossPrice,
+          highWaterMark: signal.ask,
         };
         ctx.log(
           `[${ctx.slug}] late-entry: BUY ${signal.side} filled @ ${signal.ask} (${filledShares} shares)`,
@@ -337,6 +344,15 @@ function checkStopLoss(
   const bestAsk = ctx.orderBook.bestAskInfo(pos.side)?.price ?? null;
   const bestBid = ctx.orderBook.bestBidPrice(pos.side);
 
+  // Update trailing stop: raise floor as price increases
+  if (bestAsk !== null && bestAsk > pos.highWaterMark) {
+    pos.highWaterMark = bestAsk;
+    const trailingStop = pos.highWaterMark - TRAILING_STOP_DISTANCE;
+    if (trailingStop > pos.stopLossPrice) {
+      pos.stopLossPrice = trailingStop;
+    }
+  }
+
   const GAP_CONFIRM_THRESHOLD = 5;
   const gapConfirmsPosition =
     gap !== null &&
@@ -362,8 +378,9 @@ function checkStopLoss(
   state.stopLossFired = true;
   state.position = null;
 
+  // Market sell: use bestBid for immediate fill, floor at 0.01
   const sellPrice =
-    bestBid !== null ? bestBid + 0.01 : pos.stopLossPrice - 0.01;
+    bestBid !== null ? Math.max(bestBid, 0.01) : Math.max(pos.stopLossPrice - 0.02, 0.01);
 
   ctx.log(
     `[${ctx.slug}] late-entry: stop-loss triggered — SELL ${pos.side} @ ${sellPrice}`,

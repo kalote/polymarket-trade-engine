@@ -76,7 +76,9 @@ for (const market of markets) {
 
   try {
     await client!.redeemPositions(market.conditionId);
-    console.log(`  Redeemed successfully\n`);
+    // Sync CLOB balance cache after redeem
+    await client!.updateUSDCBalance();
+    console.log(`  Redeemed + synced CLOB balance\n`);
   } catch (e) {
     console.error(`  Redemption failed: ${e}\n`);
   }
