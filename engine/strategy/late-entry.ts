@@ -214,11 +214,10 @@ type LateEntryState = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const SHARES = 5;
+const SHARES = 8;
 const INITIAL_STOP_DISTANCE = 0.10;  // max loss per share ($1 on 10 shares)
 const TRAILING_STOP_DISTANCE = 0.08; // lock in profit: trail 8c behind peak
-const MAX_ENTRY_SECONDS = 90;        // only enter in the last 90s of a slot
-const MAX_ENTRY_PRICE = 0.94;        // reject entries above this (bad risk/reward)
+const MAX_ENTRY_SECONDS = 120;       // only enter in the last 120s of a slot
 
 function checkEntry(params: {
   remaining: number;
@@ -268,7 +267,6 @@ function checkEntry(params: {
       const info = (side === "UP" ? up : down)!;
 
       if (info.liquidity < 20) return null;
-      if (info.price > MAX_ENTRY_PRICE) return null;  // risk/reward too poor
 
       return {
         side,
