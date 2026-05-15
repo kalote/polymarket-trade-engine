@@ -1,7 +1,7 @@
 // Buy and Hold strategy
 
 import type { Strategy, StrategyContext } from "./types.ts";
-import { Env } from "../../utils/config.ts";
+import { Env, type AssetStrategyParams } from "../../utils/config.ts";
 
 class RSI {
   private _period: number;
@@ -214,10 +214,14 @@ type LateEntryState = {
 // Constants
 // ---------------------------------------------------------------------------
 
-const SHARES = 8;
-const INITIAL_STOP_DISTANCE = 0.10;  // max loss per share ($1 on 10 shares)
-const TRAILING_STOP_DISTANCE = 0.08; // lock in profit: trail 8c behind peak
-const MAX_ENTRY_SECONDS = 120;       // only enter in the last 120s of a slot
+const cfg = Env.getStrategyParams();
+
+export function getPositionSize(liquidity: number, cfgParam: AssetStrategyParams): number {
+  if (liquidity >= cfgParam.liquidityFullSize) return cfgParam.shares;
+  if (liquidity <= cfgParam.minLiquidity) return cfgParam.minShares;
+  const ratio = (liquidity - cfgParam.minLiquidity) / (cfgParam.liquidityFullSize - cfgParam.minLiquidity);
+  return Math.round(cfgParam.minShares + ratio * (cfgParam.shares - cfgParam.minShares));
+}
 
 function checkEntry(params: {
   remaining: number;
@@ -250,7 +254,7 @@ function checkEntry(params: {
   const divergence = params.divergence ?? Infinity;
 
   if (
-    remaining <= MAX_ENTRY_SECONDS &&
+    remaining <= cfg.maxEntrySeconds &&
     atr &&
     atr <= 5 &&
     gapSafety &&
@@ -259,21 +263,23 @@ function checkEntry(params: {
     peakGapRatio &&
     peakGapRatio >= 0.60
   ) {
-    const upCertain = up != null && up.price > 0.80;
-    const downCertain = down != null && down.price > 0.80;
+    const upCertain = up != null && up.price > cfg.certaintyCutoff;
+    const downCertain = down != null && down.price > cfg.certaintyCutoff;
 
     if (upCertain || downCertain) {
       const side: "UP" | "DOWN" = upCertain ? "UP" : "DOWN";
       const info = (side === "UP" ? up : down)!;
 
-      if (info.liquidity < 20) return null;
+      if (info.liquidity < cfg.minLiquidity) return null;
+
+      if (info.price > cfg.maxEntryPrice) return null;
 
       return {
         side,
         ask: info.price,
         gap: absGap,
         liquidity: info.liquidity,
-        stopLossPrice: Math.max(info.price - INITIAL_STOP_DISTANCE, 0.01),
+        stopLossPrice: Math.max(info.price - cfg.initialStopDistance, 0.01),
       };
     }
   }
@@ -295,7 +301,7 @@ function placeEntry(
 
   ctx.postOrders([
     {
-      req: { tokenId, action: "buy", price: signal.ask, shares: SHARES },
+      req: { tokenId, action: "buy", price: signal.ask, shares: getPositionSize(signal.liquidity, cfg) },
       expireAtMs: ctx.slotEndMs,
       onFilled(filledShares) {
         state.position = {
@@ -345,7 +351,7 @@ function checkStopLoss(
   // Update trailing stop: raise floor as price increases
   if (bestAsk !== null && bestAsk > pos.highWaterMark) {
     pos.highWaterMark = bestAsk;
-    const trailingStop = pos.highWaterMark - TRAILING_STOP_DISTANCE;
+    const trailingStop = pos.highWaterMark - cfg.trailingStopDistance;
     if (trailingStop > pos.stopLossPrice) {
       pos.stopLossPrice = trailingStop;
     }
