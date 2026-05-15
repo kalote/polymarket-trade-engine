@@ -2,6 +2,7 @@
 
 import type { Strategy, StrategyContext } from "./types.ts";
 import { Env, type AssetStrategyParams } from "../../utils/config.ts";
+import { BtcMomentumDetector } from "./btc-momentum.ts";
 
 class RSI {
   private _period: number;
@@ -215,6 +216,7 @@ type LateEntryState = {
 // ---------------------------------------------------------------------------
 
 const cfg = Env.getStrategyParams();
+const BTC_MOMENTUM_LIVE = process.env.BTC_MOMENTUM_LIVE === "true";
 
 export function getPositionSize(liquidity: number, cfgParam: AssetStrategyParams): number {
   if (liquidity >= cfgParam.liquidityFullSize) return cfgParam.shares;
@@ -460,6 +462,7 @@ export const lateEntry: Strategy = async (ctx) => {
     stopLossFired: false,
   };
   const indicators = new Indicators();
+  const btcMomentum = new BtcMomentumDetector(5000, 0.001);
 
   const tickInterval = setInterval(() => {
     const remaining = Math.floor((ctx.slotEndMs - Date.now()) / 1000);
@@ -509,6 +512,56 @@ export const lateEntry: Strategy = async (ctx) => {
             "cyan",
           );
           placeEntry(ctx, state, signal);
+        }
+
+        // BTC momentum early entry (non-BTC assets only)
+        if (!signal && ctx.btcTicker) {
+          const btcMomentumPrice = ctx.btcTicker.price;
+          if (btcMomentumPrice !== undefined) {
+            btcMomentum.update(btcMomentumPrice);
+            const momentum = btcMomentum.detect();
+
+            if (momentum && remaining <= cfg.maxEntrySeconds) {
+              const targetSide = momentum.direction;
+              const info = targetSide === "UP"
+                ? ctx.orderBook.bestAskInfo("UP")
+                : ctx.orderBook.bestAskInfo("DOWN");
+
+              if (
+                info &&
+                info.price > 0.55 &&
+                info.price <= cfg.certaintyCutoff &&
+                info.price <= cfg.maxEntryPrice &&
+                info.liquidity >= cfg.minLiquidity
+              ) {
+                const earlyShares = Math.max(cfg.minShares, Math.floor(cfg.shares * momentum.confidence));
+                const earlyStopLoss = Math.max(info.price - cfg.initialStopDistance, 0.01);
+
+                if (BTC_MOMENTUM_LIVE) {
+                  // LIVE mode: actually place the trade
+                  const earlySignal: EntrySignal = {
+                    side: targetSide,
+                    ask: info.price,
+                    gap: 0,
+                    liquidity: info.liquidity,
+                    stopLossPrice: earlyStopLoss,
+                  };
+                  state.hasEntered = true;
+                  ctx.log(
+                    `[${ctx.slug}] [btc-momentum] LIVE entry ${targetSide} @ ${info.price} (${earlyShares} shares, BTC ${momentum.direction} ${(momentum.magnitude * 100).toFixed(2)}%, conf ${momentum.confidence.toFixed(2)})`,
+                    "cyan",
+                  );
+                  placeEntry(ctx, state, earlySignal);
+                } else {
+                  // SHADOW mode: log what we WOULD have done, but don't trade
+                  ctx.log(
+                    `[${ctx.slug}] [btc-momentum] SHADOW: would enter ${targetSide} @ ${info.price} (${earlyShares} shares, BTC ${momentum.direction} ${(momentum.magnitude * 100).toFixed(2)}%, conf ${momentum.confidence.toFixed(2)})`,
+                    "yellow",
+                  );
+                }
+              }
+            }
+          }
         }
       }
     }
